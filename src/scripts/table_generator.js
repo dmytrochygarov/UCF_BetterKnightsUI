@@ -98,7 +98,7 @@ function generateTableInContainerWithData(container, data) {
   // Loop through each data object and generate rows
   $.each(data, function (index, item) {
     // Create a new <tr> element. The index back into `data` lets the
-    // "Copy for LLM" button export rows in the order DataTables is showing them.
+    // "Copy for AI" button export rows in the order DataTables is showing them.
     const $row = $("<tr>").attr("data-bkui-index", index);
 
     /// Class ID column

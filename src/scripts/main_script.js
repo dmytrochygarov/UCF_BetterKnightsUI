@@ -645,7 +645,7 @@ window.handleTable = function (idx, container, isActive) {
       '<div class="betterknightsui-new-container"></div>'
     );
 
-    // Keep the parsed rows around for the "Copy for LLM" button, which needs
+    // Keep the parsed rows around for the "Copy for AI" button, which needs
     // the values rather than the rendered badges.
     $(container).data("betterknightsui-data", data);
 

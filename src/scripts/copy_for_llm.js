@@ -1,4 +1,4 @@
-// "Copy for LLM" button: sits in each course title bar and copies that course's
+// "Copy for AI" button: sits in each course title bar and copies that course's
 // whole section table to the clipboard as markdown.
 //
 // Injection is driven by the 200 ms scan loop (see main_script.js), so
@@ -289,7 +289,7 @@ window.bkuiCopyToClipboard = function (text) {
 
 window.bkuiSetButtonState = function ($btn, state) {
   const labels = {
-    idle: "Copy for LLM",
+    idle: "Copy for AI",
     done: "Copied!",
     error: "Copy failed",
   };
@@ -343,7 +343,7 @@ window.bkuiInjectCopyButton = function (container, isActive) {
 
   const $btn = $(
     '<button type="button" class="betterknightsui-copy-btn" ' +
-      'title="Copy this course table as markdown for an LLM"></button>'
+      'title="Copy this course table as markdown for an AI"></button>'
   );
   window.bkuiSetButtonState($btn, "idle");
 

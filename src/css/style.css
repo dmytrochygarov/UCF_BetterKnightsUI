@@ -171,7 +171,7 @@
   opacity: 0.3 !important;
 }
 
-/* "Copy for LLM" button, pinned to the right of the course title bar.
+/* "Copy for AI" button, pinned to the right of the course title bar.
    The bar centers its title, so the button is taken out of flow to keep it there. */
 .betterknightsui-copy-title-host {
   position: relative !important;
