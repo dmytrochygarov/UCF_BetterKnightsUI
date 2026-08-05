@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "BetterKnightsUI - New Look for myUCF",
-  "version": "1.7",
+  "version": "1.8",
   "description": "Makes myUCF cleaner and easier to navigate for a better course browsing experience!",
   "permissions": ["storage", "*://www.ratemyprofessors.com/*"],
   "browser_specific_settings": {

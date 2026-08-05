@@ -185,7 +185,6 @@
   z-index: 1;
   display: inline-flex !important;
   align-items: center;
-  gap: 5px;
   margin: 0 !important;
   padding: 3px 8px !important;
   border: 1px solid #e6d3c0 !important;
@@ -207,9 +206,12 @@
   border-color: #ab5b1a !important;
 }
 
+/* margin rather than flex `gap`: gap only landed in Safari 14.1, and Safari web
+   extensions run as far back as 14.0. */
 .betterknightsui-copy-btn svg {
   width: 14px;
   height: 14px;
+  margin-right: 5px;
   flex: none;
 }
 

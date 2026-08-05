@@ -229,10 +229,16 @@ window.bkuiReadCourseTitle = function ($host) {
 /* Clipboard                                                           */
 /* ------------------------------------------------------------------ */
 
-window.bkuiCopyFallback = function (text) {
+// execCommand is deprecated but it is the one path that behaves the same in a
+// Chrome MV3 content script, a Firefox MV2 one and a Safari web extension, and
+// it is what the share-link toast in main_script.js already ships with.
+window.bkuiCopyWithExecCommand = function (text) {
   try {
+    if (!document.execCommand) return false;
+
     const $textarea = $("<textarea></textarea>")
       .val(text)
+      .attr("readonly", "readonly")
       .css({
         position: "fixed",
         top: "-9999px",
@@ -240,17 +246,27 @@ window.bkuiCopyFallback = function (text) {
         opacity: 0,
       });
     $("body").append($textarea);
+
+    const active = document.activeElement;
     $textarea[0].select();
     $textarea[0].setSelectionRange(0, text.length);
     const copied = document.execCommand("copy");
+
     $textarea.remove();
+    // Hand focus back so the page's own keyboard handling is undisturbed.
+    if (active && active.focus) active.focus();
     return copied;
   } catch (err) {
     return false;
   }
 };
 
+// Synchronous path first, on purpose: navigator.clipboard resolves a promise,
+// and Safari treats the user activation as spent by the time a .catch() runs,
+// so an async fallback would be too late to recover there.
 window.bkuiCopyToClipboard = function (text) {
+  if (window.bkuiCopyWithExecCommand(text)) return Promise.resolve(true);
+
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       return navigator.clipboard
@@ -259,11 +275,12 @@ window.bkuiCopyToClipboard = function (text) {
           return true;
         })
         .catch(function () {
-          return window.bkuiCopyFallback(text);
+          return false;
         });
     }
   } catch (err) {}
-  return Promise.resolve(window.bkuiCopyFallback(text));
+
+  return Promise.resolve(false);
 };
 
 /* ------------------------------------------------------------------ */
