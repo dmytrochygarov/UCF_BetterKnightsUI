@@ -143,7 +143,10 @@
 }
 
 .badge-yellow {
-  color: #d6a814 !important;
+  /* #d6a814 was only 1.83:1 on this background, well below the green and red
+     badges. Nudged down to 2.63:1 -- between green (2.37) and red (3.90) -- so
+     it reads at badge size while keeping the same 45deg amber hue. */
+  color: #b58a0e !important;
   background-color: #f1eacb;
 }
 
