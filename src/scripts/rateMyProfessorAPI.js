@@ -137,6 +137,13 @@ async function initRateMyProfessorFetch(professorName) {
     let data = await fetchProfessorRatingsFromBackground(professorName);
     let teacher_data = await parseRateMyProfessorData(professorName, data);
 
+    // Remember the match so the "Copy for LLM" export can cite the rating and
+    // profile URL; the badges themselves keep no reference to either.
+    if (teacher_data) {
+      window.bkuiRatingCache = window.bkuiRatingCache || {};
+      window.bkuiRatingCache[professorName] = teacher_data;
+    }
+
     // UPDATE ALL THE ELEMENTS ON THE PAGE
     updateAllElementsWithProfName(professorName, teacher_data);
   } catch (error) {

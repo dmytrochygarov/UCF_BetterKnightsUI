@@ -279,6 +279,35 @@ window.prettifyStatus = function (text) {
   return null;
 };
 
+// Human-readable labels for the numeric codes the prettify* functions above
+// produce. Shared by the rendered table (table_generator.js) and the markdown
+// export (copy_for_llm.js) so the two can never drift apart. The <br> in the
+// longer mode labels is a display line break; copy_for_llm.js strips it.
+window.BKUI_LABELS = {
+  status: {
+    0: "OPEN",
+    1: "WAITLIST",
+    2: "CLOSED",
+  },
+  section: {
+    1: "LECTURE",
+    2: "LAB",
+    3: "RES",
+    4: "DISCUSSION",
+  },
+  mode: {
+    0: "In Person",
+    1: "Mixed",
+    2: "Mixed-Mode<br>20% Classroom",
+    3: "Mixed with<br>Livestream",
+    4: "Livestream<br>20% Attendance",
+    5: "Video Content<br>20% Attendance",
+    6: "Video<br>Livestream",
+    7: "Online Video<br>Content",
+    8: "Web-Based",
+  },
+};
+
 window.extractDataFromTableRow = function (container) {
   var tr = $(container).find("[id^='trSSR_CLSRCH_MTG1\\$']");
   if (tr.length === 0) return null;
@@ -616,7 +645,15 @@ window.handleTable = function (idx, container, isActive) {
       '<div class="betterknightsui-new-container"></div>'
     );
 
+    // Keep the parsed rows around for the "Copy for LLM" button, which needs
+    // the values rather than the rendered badges.
+    $(container).data("betterknightsui-data", data);
+
     window.toggleContainers(container, isActive);
+  }
+
+  if (typeof window.bkuiInjectCopyButton === "function") {
+    window.bkuiInjectCopyButton(container, isActive);
   }
 };
 

@@ -170,3 +170,71 @@
 .betterknightsui-placeholder::placeholder {
   opacity: 0.3 !important;
 }
+
+/* "Copy for LLM" button, pinned to the right of the course title bar.
+   The bar centers its title, so the button is taken out of flow to keep it there. */
+.betterknightsui-copy-title-host {
+  position: relative !important;
+}
+
+.betterknightsui-copy-btn {
+  position: absolute !important;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  margin: 0 !important;
+  padding: 3px 8px !important;
+  border: 1px solid #e6d3c0 !important;
+  border-radius: 6px !important;
+  background: #ffffff !important;
+  color: #ab5b1a !important;
+  font-family: Arimo, "Albert Sans", system-ui, -apple-system, "Helvetica Neue",
+    Arial, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.betterknightsui-copy-btn:hover {
+  background: #fdf5ee !important;
+  border-color: #ab5b1a !important;
+}
+
+.betterknightsui-copy-btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* The confirmation states need their own :hover, or the idle .betterknightsui-copy-btn:hover
+   above wins on specificity and repaints the green "Copied!" button orange mid-hover. */
+.betterknightsui-copy-btn-done,
+.betterknightsui-copy-btn-done:hover {
+  border-color: #a3cfbb !important;
+  background: #f1f9f4 !important;
+  color: #157347 !important;
+}
+
+.betterknightsui-copy-btn-done:hover {
+  border-color: #157347 !important;
+  background: #e7f4ec !important;
+}
+
+.betterknightsui-copy-btn-error,
+.betterknightsui-copy-btn-error:hover {
+  border-color: #f0b7b7 !important;
+  background: #fdf2f2 !important;
+  color: #d22d2d !important;
+}
+
+.betterknightsui-copy-btn-error:hover {
+  border-color: #d22d2d !important;
+  background: #fbe6e6 !important;
+}

@@ -94,6 +94,14 @@ Ratings resolve asynchronously after the table renders, in four hops:
 
 Sorting does not read cell text. Each `<td>` carries a `data-order` attribute (numeric status/section/mode codes, minutes-from-midnight for times), consumed by the custom `dom-data-order` order type registered at [table_generator.js:591](src/scripts/table_generator.js#L591). Any new sortable column needs both the `data-order` attribute and an entry in the `columnDefs`. When a rating arrives late, `updateAllElementsWithProfName` rewrites the instructor cell's `data-order` to `(5 - rating) * 100` so re-sorts stay correct.
 
+### Copy for LLM
+
+[copy_for_llm.js](src/scripts/copy_for_llm.js) puts a button in each course title bar (`div[id^="win0divSSR_CLSRSLT_WRK_GROUPBOX2GP"]`, the band that survives the rebuild because it lives outside the emptied `ACE_SSR_CLSRSLT_WRK_GROUPBOX2$` table) that copies that course's sections as a markdown table. It is injected from `handleTable`, so like everything else on the scan loop it guards itself — on `.betterknightsui-copy-btn`.
+
+It never scrapes the rendered badges. `handleTable` stashes its parsed rows via `$(container).data("betterknightsui-data")` and each `<tr>` carries `data-bkui-index`, so the export reads real values while following the order DataTables is currently displaying; if the stash is gone it re-parses the untouched clone in `.betterknightsui-old-container`. RateMyProfessors results are kept in `window.bkuiRatingCache` (written by [rateMyProfessorAPI.js](src/scripts/rateMyProfessorAPI.js)) purely so the markdown can carry the profile URL — the badges themselves hold no reference to it.
+
+Code→label text (status, section, mode) lives in one place, `window.BKUI_LABELS` in [main_script.js:286](src/scripts/main_script.js#L286), and is read by both the rendered table and the markdown; only icons and badge styling stay in `table_generator.js`. The `<br>` in the long mode labels is a display line break the markdown strips.
+
 ### Storage and popup
 
 [popup.js](src/scripts/popup.js) writes two `browser.storage.sync` keys, both read by content scripts:

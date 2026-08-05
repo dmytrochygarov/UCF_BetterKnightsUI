@@ -97,8 +97,9 @@ function generateTableInContainerWithData(container, data) {
   const $tbody = $table.find("tbody");
   // Loop through each data object and generate rows
   $.each(data, function (index, item) {
-    // Create a new <tr> element
-    const $row = $("<tr>");
+    // Create a new <tr> element. The index back into `data` lets the
+    // "Copy for LLM" button export rows in the order DataTables is showing them.
+    const $row = $("<tr>").attr("data-bkui-index", index);
 
     /// Class ID column
     const $classId = $(
@@ -123,17 +124,19 @@ function generateTableInContainerWithData(container, data) {
     // STATUS options and badge styles mapping
     let status_badge_style = "bg-light text-body-secondary";
     status_badge_text = "?";
+    // Labels come from window.BKUI_LABELS (main_script.js) so the rendered table
+    // and the markdown export stay in sync; only the styling lives here.
     const statusMappings = {
       0: {
-        label: "OPEN",
+        label: window.BKUI_LABELS.status[0],
         style: "badge-green",
       },
       1: {
-        label: "WAITLIST",
+        label: window.BKUI_LABELS.status[1],
         style: "badge-yellow",
       },
       2: {
-        label: "CLOSED",
+        label: window.BKUI_LABELS.status[2],
         style: "badge-red",
       },
     };
@@ -152,22 +155,22 @@ function generateTableInContainerWithData(container, data) {
     // SECTION options mapping with text and icon
     const sectionOptions = {
       1: {
-        text: "LECTURE",
+        text: window.BKUI_LABELS.section[1],
         icon: "fa-chalkboard-teacher",
         badge_style: "bg-success-subtle text-success",
       },
       2: {
-        text: "LAB",
+        text: window.BKUI_LABELS.section[2],
         icon: "fa-flask",
         badge_style: "bg-primary-subtle text-primary",
       },
       3: {
-        text: "RES",
+        text: window.BKUI_LABELS.section[3],
         icon: "fa-book",
         badge_style: "bg-danger-subtle text-danger",
       },
       4: {
-        text: "DISCUSSION",
+        text: window.BKUI_LABELS.section[4],
         icon: "fa-comments",
         badge_style: "bg-info-subtle text-info",
       },
@@ -233,47 +236,47 @@ function generateTableInContainerWithData(container, data) {
     //MODE
     const modeOptions = {
       0: {
-        text: "In Person",
+        text: window.BKUI_LABELS.mode[0],
         icon: "fa-user",
         badge_style: "bg-success-subtle text-success",
       },
       1: {
-        text: "Mixed",
+        text: window.BKUI_LABELS.mode[1],
         icon: "fa-adjust",
         badge_style: "bg-primary-subtle text-primary",
       },
       2: {
-        text: "Mixed-Mode<br>20% Classroom",
+        text: window.BKUI_LABELS.mode[2],
         icon: "fa-chalkboard-teacher",
         badge_style: "bg-info-subtle text-info",
       },
       3: {
-        text: "Mixed with<br>Livestream",
+        text: window.BKUI_LABELS.mode[3],
         icon: "fa-video",
         badge_style: null,
       },
       4: {
-        text: "Livestream<br>20% Attendance",
+        text: window.BKUI_LABELS.mode[4],
         icon: "fa-broadcast-tower",
         badge_style: null,
       },
       5: {
-        text: "Video Content<br>20% Attendance",
+        text: window.BKUI_LABELS.mode[5],
         icon: "fa-film",
         badge_style: null,
       },
       6: {
-        text: "Video<br>Livestream",
+        text: window.BKUI_LABELS.mode[6],
         icon: "fa-video",
         badge_style: null,
       },
       7: {
-        text: "Online Video<br>Content",
+        text: window.BKUI_LABELS.mode[7],
         icon: "fa-globe",
         badge_style: null,
       },
       8: {
-        text: "Web-Based",
+        text: window.BKUI_LABELS.mode[8],
         icon: "fa-laptop",
         badge_style: null,
       },

@@ -30,6 +30,7 @@
         "scripts/jquery.min.js",
         "scripts/main_script.js",
         "scripts/table_generator.js",
+        "scripts/copy_for_llm.js",
         "scripts/datatables.min.js",
         "scripts/rateMyProfessorAPI.js",
         "scripts/professorNameMatching.js",
