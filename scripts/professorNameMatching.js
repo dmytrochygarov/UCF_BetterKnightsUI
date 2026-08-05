@@ -142,15 +142,6 @@ function getMatchingProfessorId(rawName, professors) {
   const SURNAME_W = 0.7;
   const GIVEN_W = 0.3;
 
-  for (let i in professors) {
-    let p = professors[i];
-    if (p.firstName !== "Bonnie") continue;
-    professors[i] = {
-      ...p,
-      firstName: "Cobry",
-    };
-  }
-
   const inputTokens = tokenize(rawName);
   if (!inputTokens.length) return null;
 
