@@ -1026,7 +1026,36 @@ window.checkExtensionState = function () {
   } catch (ex) {}
 };
 
+// The vendor stylesheets are appended to the page's own <head> instead of being
+// listed in the manifest's content_scripts.css. Manifest CSS is injected at
+// document_start, so PeopleSoft's own stylesheets load afterwards and win every
+// specificity tie -- that strips the Bootstrap button colours, the Albert Sans /
+// Arimo faces, and the "Font Awesome 6 Free" font-family (leaving tofu boxes
+// where the icons should be). Appending here puts them last in the cascade,
+// which is where they sat before the multi-browser port. The files are local, so
+// this costs no network access; they must stay in web_accessible_resources.
+window.injectVendorStylesheets = function () {
+  try {
+    if ($("head > link.betterknightsui-vendor-css").length) return;
+
+    [
+      "css/vendor/bootstrap.min.css",
+      "css/vendor/fontawesome.min.css",
+      "css/vendor/jquery.dataTables.min.css",
+      "css/vendor/google-fonts.css",
+    ].forEach(function (path) {
+      $("<link>", {
+        rel: "stylesheet",
+        class: "betterknightsui-vendor-css",
+        href: browser.runtime.getURL(path),
+      }).appendTo("head");
+    });
+  } catch (ex) {}
+};
+
 $(document).ready(function () {
+  window.injectVendorStylesheets();
+
   window.myscan();
   setInterval(window.myscan, 200);
 

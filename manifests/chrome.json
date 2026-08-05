@@ -16,6 +16,7 @@
     {
       "resources": [
         "images/popup_icon_128.png",
+        "css/vendor/*",
         "css/webfonts/*",
         "css/fonts/*"
       ],
@@ -34,14 +35,7 @@
         "scripts/professorNameMatching.js",
         "scripts/bootstrap.min.js"
       ],
-      "css": [
-        "css/vendor/bootstrap.min.css",
-        "css/vendor/fontawesome.min.css",
-        "css/vendor/jquery.dataTables.min.css",
-        "css/vendor/google-fonts.css",
-        "css/style.css",
-        "css/datatables.min.css"
-      ],
+      "css": ["css/style.css", "css/datatables.min.css"],
       "matches": [
         "https://csprod-ss.net.ucf.edu/*/CSPROD/STUDENT/*",
         "https://my.ucf.edu/psp/IHPROD/EMPLOYEE/CSPROD/*"
