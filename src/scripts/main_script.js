@@ -1044,6 +1044,9 @@ window.myscan = function () {
   if (window.getWindowClassSearchFilterContainer() != null) {
     window.prettifyClassSearchFilterContainer(extensionEnabled);
   }
+  if (typeof window.injectCalendarExportControl === "function") {
+    window.injectCalendarExportControl(extensionEnabled);
+  }
   if (extensionEnabled) {
     window.closePopupIfPresent();
   }
