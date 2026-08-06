@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `diab-ma/UCF_BetterKnightsUI` (`origin`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical roles map 1:1 (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
+
 ## What this is
 
 BetterKnightsUI is a browser extension that reskins UCF's myUCF class search (a legacy PeopleSoft app) into a Bootstrap/DataTables interface and annotates instructors with RateMyProfessors ratings. It ships for Chrome, Firefox, and Safari.
