@@ -1,5 +1,75 @@
 importScripts("browser-polyfill.min.js");
 
+/** tabId → Port from the My Class Schedule list-view frame (Calendar Export popup). */
+const calendarExportPorts = new Map();
+
+browser.runtime.onConnect.addListener((port) => {
+  if (port.name !== "bkui-calendar-export") return;
+  const tabId = port.sender && port.sender.tab && port.sender.tab.id;
+  if (tabId == null) return;
+
+  calendarExportPorts.set(tabId, port);
+  port.onDisconnect.addListener(() => {
+    if (calendarExportPorts.get(tabId) === port) {
+      calendarExportPorts.delete(tabId);
+    }
+  });
+});
+
+/**
+ * Ask the schedule-frame port for a probe/run result.
+ * @param {number} tabId
+ * @param {"probe"|"run"} type
+ * @returns {Promise<Object>}
+ */
+function relayCalendarExportPort(tabId, type) {
+  return new Promise((resolve) => {
+    const port = calendarExportPorts.get(tabId);
+    if (!port) {
+      resolve(
+        type === "probe"
+          ? { onSchedule: false }
+          : { ok: false, onSchedule: false }
+      );
+      return;
+    }
+
+    const resultType = type + "Result";
+    let settled = false;
+
+    function finish(payload) {
+      if (settled) return;
+      settled = true;
+      port.onMessage.removeListener(onMsg);
+      resolve(payload);
+    }
+
+    function onMsg(msg) {
+      if (msg && msg.type === resultType) finish(msg);
+    }
+
+    port.onMessage.addListener(onMsg);
+    try {
+      port.postMessage({ type });
+    } catch (_) {
+      finish(
+        type === "probe"
+          ? { onSchedule: false }
+          : { ok: false, onSchedule: false }
+      );
+      return;
+    }
+
+    setTimeout(function () {
+      finish(
+        type === "probe"
+          ? { onSchedule: false }
+          : { ok: false, onSchedule: false }
+      );
+    }, 2000);
+  });
+}
+
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "fetchProfessorRatings") {
     fetchProfessorRatings(message.professorName)
@@ -25,6 +95,16 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           error: error.message,
         })
       );
+  } else if (message.action === "bkuiCalendarExportProbe") {
+    relayCalendarExportPort(message.tabId, "probe").then((result) => {
+      sendResponse({
+        onSchedule: !!(result && result.onSchedule),
+      });
+    });
+  } else if (message.action === "bkuiCalendarExportRun") {
+    relayCalendarExportPort(message.tabId, "run").then((result) => {
+      sendResponse(result || { ok: false, onSchedule: false });
+    });
   }
 
   // Indicate that the listener will respond asynchronously

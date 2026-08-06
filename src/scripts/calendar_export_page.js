@@ -1,12 +1,59 @@
 "use strict";
 
 /**
- * My Class Schedule page UI for Calendar Export (#5).
+ * My Class Schedule page UI for Calendar Export (#5 / #6).
  * Extract → build → .ics download + skip toast. Shared runCalendarExport
- * is also the hook for popup (#6).
+ * is the hook for both the page control and the extension popup.
  *
  * Content-script globals; Node tests require() the pure helpers.
  */
+
+/** Port name shared with background.js for popup ↔ schedule-frame messaging. */
+const BKUI_CALENDAR_EXPORT_PORT = "bkui-calendar-export";
+
+/**
+ * Popup Export button availability from a schedule-frame probe.
+ * @param {{ onSchedule?: boolean, extensionEnabled?: boolean }|null|undefined} probe
+ * @returns {{ available: boolean, buttonLabel: string, inactiveHint: string }}
+ */
+function calendarExportPopupState(probe) {
+  const enabled = !probe || probe.extensionEnabled !== false;
+  const onSchedule = !!(probe && probe.onSchedule);
+  return {
+    available: enabled && onSchedule,
+    buttonLabel: "Export to calendar",
+    inactiveHint: enabled
+      ? "Open My Class Schedule (list view) to export."
+      : "Enable the extension to export your schedule.",
+  };
+}
+
+/**
+ * Content-script side of the popup port protocol.
+ * @param {{ type?: string }|null|undefined} message
+ * @param {{ onSchedule: boolean, runExport: function(): * }} ctx
+ * @returns {Object|null}
+ */
+function handleCalendarExportPortMessage(message, ctx) {
+  if (!message || !message.type) return null;
+
+  if (message.type === "probe") {
+    return { type: "probeResult", onSchedule: !!ctx.onSchedule };
+  }
+
+  if (message.type === "run") {
+    if (!ctx.onSchedule) {
+      return { type: "runResult", ok: false, onSchedule: false };
+    }
+    const result = ctx.runExport();
+    if (!result) {
+      return { type: "runResult", ok: false, onSchedule: true };
+    }
+    return { type: "runResult", ok: true, result };
+  }
+
+  return null;
+}
 
 /**
  * @param {{ exported?: number, skipped?: number }} result
@@ -65,6 +112,8 @@ function downloadCalendarIcs(icsText, filename) {
   }, 1000);
 }
 
+const root = typeof window !== "undefined" ? window : globalThis;
+
 /**
  * Full Calendar Export pipeline for the current document.
  * @returns {{ ics: string, exported: number, skipped: number, skips: Object[] }|null}
@@ -92,11 +141,63 @@ function runCalendarExport() {
 }
 
 /**
+ * Keep a background port open only while this frame hosts list view and
+ * the extension is enabled — so the popup can reach the iframe that has DOM.
+ * @param {boolean} isEnabled
+ */
+function syncCalendarExportPort(isEnabled) {
+  if (typeof browser === "undefined" || !browser.runtime || !browser.runtime.connect) {
+    return;
+  }
+
+  const onList =
+    typeof isMyClassScheduleListView === "function" &&
+    isMyClassScheduleListView(document);
+  const shouldConnect = !!isEnabled && onList;
+  const existing = root.__bkuiCalendarExportPort;
+
+  if (!shouldConnect) {
+    if (existing) {
+      try {
+        existing.disconnect();
+      } catch (_) {
+        /* ignore */
+      }
+      root.__bkuiCalendarExportPort = null;
+    }
+    return;
+  }
+
+  if (existing) return;
+
+  const port = browser.runtime.connect({ name: BKUI_CALENDAR_EXPORT_PORT });
+  root.__bkuiCalendarExportPort = port;
+
+  port.onMessage.addListener(function (message) {
+    const reply = handleCalendarExportPortMessage(message, {
+      onSchedule:
+        typeof isMyClassScheduleListView === "function" &&
+        isMyClassScheduleListView(document),
+      runExport: runCalendarExport,
+    });
+    if (reply) port.postMessage(reply);
+  });
+
+  port.onDisconnect.addListener(function () {
+    if (root.__bkuiCalendarExportPort === port) {
+      root.__bkuiCalendarExportPort = null;
+    }
+  });
+}
+
+/**
  * Idempotent page control. Guard: .betterknightsui-calendar-export-btn.
  * Honors extension enable/disable like other chrome.
  * @param {boolean} isEnabled
  */
 function injectCalendarExportControl(isEnabled) {
+  syncCalendarExportPort(isEnabled);
+
   if (typeof $ === "undefined") return;
 
   const onList =
@@ -146,9 +247,12 @@ function injectCalendarExportControl(isEnabled) {
   }
 }
 
-const root = typeof window !== "undefined" ? window : globalThis;
 root.formatCalendarExportToast = formatCalendarExportToast;
 root.calendarExportFilename = calendarExportFilename;
 root.downloadCalendarIcs = downloadCalendarIcs;
 root.runCalendarExport = runCalendarExport;
 root.injectCalendarExportControl = injectCalendarExportControl;
+root.calendarExportPopupState = calendarExportPopupState;
+root.handleCalendarExportPortMessage = handleCalendarExportPortMessage;
+root.syncCalendarExportPort = syncCalendarExportPort;
+root.BKUI_CALENDAR_EXPORT_PORT = BKUI_CALENDAR_EXPORT_PORT;
