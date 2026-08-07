@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BetterKnightsUI - New Look for myUCF",
-  "version": "1.9",
+  "version": "2.0",
   "description": "Makes myUCF cleaner and easier to navigate for a better course browsing experience!",
   "permissions": ["storage", "nativeMessaging"],
   "host_permissions": ["*://www.ratemyprofessors.com/*", "*://ratemyprofessors.com/*"],
@@ -31,6 +31,9 @@
         "scripts/main_script.js",
         "scripts/table_generator.js",
         "scripts/copy_for_llm.js",
+        "scripts/calendar_export.js",
+        "scripts/schedule_extract.js",
+        "scripts/calendar_export_page.js",
         "scripts/datatables.min.js",
         "scripts/rateMyProfessorAPI.js",
         "scripts/professorNameMatching.js",
@@ -39,6 +42,8 @@
       "css": ["css/style.css", "css/datatables.min.css"],
       "matches": [
         "https://csprod-ss.net.ucf.edu/*/CSPROD/STUDENT/*",
+        "https://csprod-ss.net.ucf.edu/psc/CSPROD/*",
+        "https://csprod-ss.net.ucf.edu/psp/CSPROD/*",
         "https://my.ucf.edu/psp/IHPROD/EMPLOYEE/CSPROD/*"
       ],
       "all_frames": true

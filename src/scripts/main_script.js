@@ -1027,7 +1027,20 @@ window.extensionEnabled = false;
 window.myscan = function () {
   window.checkExtensionState();
 
-  if (window.getWindowClassSearchTableContainer() != null) {
+  const onClassSearchTable = window.getWindowClassSearchTableContainer() != null;
+  const onClassSearchFilter =
+    window.getWindowClassSearchFilterContainer() != null;
+  const onClassSchedule =
+    typeof window.isMyClassScheduleListView === "function" &&
+    window.isMyClassScheduleListView(document);
+
+  // Vendor CSS only in frames where BetterKnightsUI draws UI — the match
+  // patterns also cover CSPROD pages this extension must not restyle.
+  if (onClassSearchTable || onClassSearchFilter || onClassSchedule) {
+    window.injectVendorStylesheets();
+  }
+
+  if (onClassSearchTable) {
     let tables = $('div[id^="win0divSSR_CLSRSLT_WRK_GROUPBOX2$"]');
     if (tables.length == 0) return;
     tables.each(function (i) {
@@ -1041,8 +1054,11 @@ window.myscan = function () {
       });
     }
   }
-  if (window.getWindowClassSearchFilterContainer() != null) {
+  if (onClassSearchFilter) {
     window.prettifyClassSearchFilterContainer(extensionEnabled);
+  }
+  if (typeof window.injectCalendarExportControl === "function") {
+    window.injectCalendarExportControl(extensionEnabled);
   }
   if (extensionEnabled) {
     window.closePopupIfPresent();
@@ -1091,8 +1107,6 @@ window.injectVendorStylesheets = function () {
 };
 
 $(document).ready(function () {
-  window.injectVendorStylesheets();
-
   window.myscan();
   setInterval(window.myscan, 200);
 
