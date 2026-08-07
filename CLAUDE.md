@@ -20,7 +20,7 @@ Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
 
 BetterKnightsUI is a browser extension that reskins UCF's myUCF class search (a legacy PeopleSoft app) into a Bootstrap/DataTables interface and annotates instructors with RateMyProfessors ratings. It ships for Chrome, Firefox, and Safari.
 
-There is **no test suite and no linter**. Vendored libraries (`jquery.min.js`, `bootstrap.min.js`, `datatables.min.js`, `browser-polyfill.min.js`) are checked in and must not be edited. Source files are loaded by the browser exactly as written — there is no bundler or transpiler; the "build" is a file copy.
+Tests live in `test/` and run with `npm test` (Node's built-in runner; `jsdom` is the only devDependency, used for DOM-fixture tests). There is **no linter**. Vendored libraries (`jquery.min.js`, `bootstrap.min.js`, `datatables.min.js`, `browser-polyfill.min.js`) are checked in and must not be edited. Source files are loaded by the browser exactly as written — there is no bundler or transpiler; the "build" is a file copy.
 
 Git remote is [DimChig/UCF_BetterKnightsUI](https://github.com/DimChig/UCF_BetterKnightsUI) on branch `main`.
 
@@ -56,19 +56,21 @@ Development is build → reload:
 
 Chrome and Firefox take that zip directly (store item `enclfeopdchccjmnlpgcejjibahkkjkj`, AMO slug `betterknightsui`). Safari does not: it ships as a Mac App Store app (`id6761318156`) built from an Xcode wrapper project that is **not** in this repo — `safari-app/` is gitignored. If that project is lost, regenerate it with `xcrun safari-web-extension-converter build/safari` and keep the bundle identifier so it updates the existing listing rather than creating a new one.
 
-Target page for all manual testing: myUCF → Student Self Service → Student Records → Enrollment → Add Classes → "Search".
+Manual-testing pages: class search is myUCF → Student Self Service → Student Records → Enrollment → Add Classes → "Search"; Calendar Export lives on myUCF → Student Self Service → Student Center → Other Academics → Class Schedule (List view).
 
 ### Verifying without a UCF login
 
-There is no test suite, and the real page is behind a UCF NID. The content scripts do load into jsdom, though — they are plain globals with no ES modules, and outside `browser.storage`/`browser.runtime` they touch no extension API. A throwaway harness can `eval` the manifest's `js` list in order against a hand-built PeopleSoft-shaped DOM (a `win0divSSR_CLSRSLT_WRK_GROUPBOX2$N` box wrapping an `ACE_SSR_CLSRSLT_WRK_GROUPBOX2$N` table of `win0divSSR_CLSRSLT_WRK_GROUPBOX3$N` rows), stub `window.browser.storage.sync.get` to yield `{extensionEnabled: true}`, and call `window.myscan()` directly. Calling it repeatedly is also the cheapest proof that a new DOM mutation is idempotent.
+The real pages are behind a UCF NID, so automated coverage runs in Node: `npm test` (Node's built-in runner). The pure Calendar Export builder and extractor are exercised by `require()` against hand-built Meetings and a saved list-view fixture (`test/fixtures/enrolled_list_view.html`), and `test/content_scripts_load.test.js` loads the manifest's full `js` list **as classic scripts in one shared jsdom scope** — the only way to catch cross-file global collisions (top-level `const` in two content scripts throws in the browser but not under per-file `require()`) — and pins the three manifests to lockstep.
 
-jsdom is deliberately not a dependency here — install it outside the tree. Two traps: `navigator.clipboard` and `document.execCommand` both need stubbing, and one unhandled rejection (loading `table_generator.js` without `rateMyProfessorAPI.js`, say) kills the Node process outright, so always load the full script list.
+For ad-hoc class-search harnesses, the same recipe works: eval the manifest's `js` list in order against a hand-built PeopleSoft-shaped DOM (a `win0divSSR_CLSRSLT_WRK_GROUPBOX2$N` box wrapping an `ACE_SSR_CLSRSLT_WRK_GROUPBOX2$N` table of `win0divSSR_CLSRSLT_WRK_GROUPBOX3$N` rows), stub `window.chrome.runtime.id` plus `window.browser` (storage/runtime), and call `window.myscan()` directly. Calling it repeatedly is also the cheapest proof that a new DOM mutation is idempotent. Two traps: `navigator.clipboard` and `document.execCommand` both need stubbing, and one unhandled rejection (loading `table_generator.js` without `rateMyProfessorAPI.js`, say) kills the Node process outright, so always load the full script list.
 
 ## Architecture
 
 ### Load order is dependency order
 
-The `content_scripts` array in each manifest is the only dependency graph — there are no modules or imports. Everything is a bare global or hung off `window`. `browser-polyfill.min.js` must come first, then jQuery before everything else; `datatables.min.js` must load before `table_generator.js` runs (it does, because the latter only executes inside the scan loop). Reordering that array breaks things silently. The three manifests each carry their own copy of the list — keep them in sync.
+The `content_scripts` array in each manifest is the only dependency graph — there are no modules or imports. Everything is a bare global or hung off `window`. `browser-polyfill.min.js` must come first, then jQuery before everything else; `datatables.min.js` must load before `table_generator.js` runs (it does, because the latter only executes inside the scan loop). Reordering that array breaks things silently. The three manifests each carry their own copy of the list — `test/content_scripts_load.test.js` asserts they stay identical.
+
+All content scripts share **one global lexical scope**: a top-level `const` in two files is a `SyntaxError` that silently kills the second file (its globals just never appear, and `typeof` guards elsewhere hide the loss). The calendar files are IIFE-wrapped for exactly this reason — wrap any new content script the same way and export via `window.x = x`.
 
 ### The 200 ms scan loop
 
@@ -123,6 +125,16 @@ Sorting does not read cell text. Each `<td>` carries a `data-order` attribute (n
 It never scrapes the rendered badges. `handleTable` stashes its parsed rows via `$(container).data("betterknightsui-data")` and each `<tr>` carries `data-bkui-index`, so the export reads real values while following the order DataTables is currently displaying; if the stash is gone it re-parses the untouched clone in `.betterknightsui-old-container`. RateMyProfessors results are kept in `window.bkuiRatingCache` (written by [rateMyProfessorAPI.js](src/scripts/rateMyProfessorAPI.js)) purely so the markdown can carry the profile URL — the badges themselves hold no reference to it.
 
 Code→label text (status, section, mode) lives in one place, `window.BKUI_LABELS` in [main_script.js:286](src/scripts/main_script.js#L286), and is read by both the rendered table and the markdown; only icons and badge styling stay in `table_generator.js`. The `<br>` in the long mode labels is a display line break the markdown strips.
+
+### Calendar Export
+
+Post-enrollment feature on **My Class Schedule list view** (`SSR_SSENRL_LIST`), per ADR-0001: one `.ics` download of the registered Enrolled Schedule, nothing on class search, no calendar APIs. Three layers, glossary terms in `CONTEXT.md`:
+
+- [schedule_extract.js](src/scripts/schedule_extract.js) — `isMyClassScheduleListView` (requires a `CLASS_MTG_VW$scroll$` grid **and** a `win0divDERIVED_REGFRM1_DESCR20$` course groupbox, and no class-search markup) and `extractEnrolledMeetings` (Enrolled-status courses only; blank meeting-row cells inherit class number/type/instructors from the row above).
+- [calendar_export.js](src/scripts/calendar_export.js) — pure `buildCalendarExport(Meetings) → {ics, exported, skipped, skips}`. One VEVENT per Meeting, weekly RRULE bounded by the meeting date range, `TZID=America/New_York` with an embedded VTIMEZONE, no VALARM. UIDs are durable identity only (class number + meeting type + day pattern) so a re-export after times change *updates* prior events instead of duplicating; times deliberately stay out of the UID.
+- [calendar_export_page.js](src/scripts/calendar_export_page.js) — page control (injected from `myscan`, guard `.betterknightsui-calendar-export-btn`, removed when disabled) and the popup endpoint. The popup messages the active tab with `browser.tabs.sendMessage`; **only the schedule frame replies** (other frames return no response), which is how the right iframe is found without frameId bookkeeping — background.js is not involved. The popup performs the actual download from the returned ics text because the schedule frame is a cross-origin iframe where Chrome blocks downloads lacking a user gesture; the page-button path downloads in-frame (the click is the gesture). Skip toasts always show on the page.
+
+Vendor stylesheets (`injectVendorStylesheets`) are injected from the scan loop **only when a decorated page is detected** — the CSPROD match patterns also hit grades/finances-type pages that Bootstrap's reboot CSS must not restyle.
 
 ### Storage and popup
 

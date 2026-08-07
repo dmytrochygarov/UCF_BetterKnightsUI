@@ -9,7 +9,7 @@ require("../src/scripts/calendar_export_page.js");
 
 const {
   calendarExportPopupState,
-  handleCalendarExportPortMessage,
+  handleCalendarExportMessage,
 } = globalThis;
 
 describe("calendarExportPopupState", () => {
@@ -42,69 +42,88 @@ describe("calendarExportPopupState", () => {
   });
 });
 
-describe("handleCalendarExportPortMessage", () => {
-  it("answers probe with onSchedule from the page context", () => {
-    const reply = handleCalendarExportPortMessage(
-      { type: "probe" },
-      { onSchedule: true, runExport: () => null }
+describe("handleCalendarExportMessage", () => {
+  const ctx = (overrides = {}) => ({
+    onSchedule: true,
+    enabled: true,
+    runExport: () => null,
+    ...overrides,
+  });
+
+  it("answers a probe from the schedule frame", () => {
+    const reply = handleCalendarExportMessage(
+      { action: "bkuiCalendarExportProbe" },
+      ctx()
     );
-    assert.deepEqual(reply, { type: "probeResult", onSchedule: true });
+    assert.deepEqual(reply, { onSchedule: true });
+  });
+
+  it("stays silent on probe when not on My Class Schedule list view", () => {
+    const reply = handleCalendarExportMessage(
+      { action: "bkuiCalendarExportProbe" },
+      ctx({ onSchedule: false })
+    );
+    assert.equal(reply, null);
   });
 
   it("runs the shared export pipeline on run when on schedule", () => {
     let called = 0;
     const result = { exported: 2, skipped: 1, ics: "BEGIN:VCALENDAR" };
-    const reply = handleCalendarExportPortMessage(
-      { type: "run" },
-      {
-        onSchedule: true,
+    const reply = handleCalendarExportMessage(
+      { action: "bkuiCalendarExportRun" },
+      ctx({
         runExport: () => {
           called += 1;
           return result;
         },
-      }
+      })
     );
     assert.equal(called, 1);
-    assert.deepEqual(reply, { type: "runResult", ok: true, result });
+    assert.deepEqual(reply, { ok: true, onSchedule: true, result });
   });
 
-  it("does not run export when not on My Class Schedule list view", () => {
+  it("stays silent on run when not on My Class Schedule list view", () => {
     let called = 0;
-    const reply = handleCalendarExportPortMessage(
-      { type: "run" },
-      {
+    const reply = handleCalendarExportMessage(
+      { action: "bkuiCalendarExportRun" },
+      ctx({
         onSchedule: false,
         runExport: () => {
           called += 1;
           return { exported: 1 };
         },
-      }
+      })
     );
     assert.equal(called, 0);
-    assert.deepEqual(reply, {
-      type: "runResult",
-      ok: false,
-      onSchedule: false,
-    });
+    assert.equal(reply, null);
+  });
+
+  it("stays silent on run when the extension is disabled", () => {
+    let called = 0;
+    const reply = handleCalendarExportMessage(
+      { action: "bkuiCalendarExportRun" },
+      ctx({
+        enabled: false,
+        runExport: () => {
+          called += 1;
+          return { exported: 1 };
+        },
+      })
+    );
+    assert.equal(called, 0);
+    assert.equal(reply, null);
   });
 
   it("reports failure when the shared pipeline returns nothing", () => {
-    const reply = handleCalendarExportPortMessage(
-      { type: "run" },
-      { onSchedule: true, runExport: () => null }
+    const reply = handleCalendarExportMessage(
+      { action: "bkuiCalendarExportRun" },
+      ctx()
     );
-    assert.deepEqual(reply, {
-      type: "runResult",
-      ok: false,
-      onSchedule: true,
-    });
+    assert.deepEqual(reply, { ok: false, onSchedule: true });
   });
 
-  it("ignores unknown message types", () => {
-    const reply = handleCalendarExportPortMessage(
-      { type: "nope" },
-      { onSchedule: true, runExport: () => null }
-    );
+  it("ignores unknown message actions", () => {
+    const reply = handleCalendarExportMessage({ action: "nope" }, ctx());
     assert.equal(reply, null);
   });
 });

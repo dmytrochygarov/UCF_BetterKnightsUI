@@ -3,7 +3,6 @@ $(document).ready(function() {
     const $toggleSwitch = $('#toggleExtension');
     const $exportBtn = $('#popupCalendarExport');
     const $exportHint = $('#popupCalendarExportHint');
-    let probeGeneration = 0;
 
     function readExtensionEnabled() {
         return browser.storage.sync.get('extensionEnabled').then(function(data) {
@@ -12,17 +11,7 @@ $(document).ready(function() {
     }
 
     function applyCalendarExportPopupState(probe) {
-        const state = typeof calendarExportPopupState === 'function'
-            ? calendarExportPopupState(probe)
-            : {
-                available: !!(probe && probe.onSchedule) &&
-                    (!probe || probe.extensionEnabled !== false),
-                buttonLabel: 'Export to calendar',
-                inactiveHint: (!probe || probe.extensionEnabled !== false)
-                    ? 'Open My Class Schedule (list view) to export.'
-                    : 'Enable the extension to export your schedule.'
-            };
-
+        const state = calendarExportPopupState(probe);
         $exportBtn.text(state.buttonLabel);
         $exportBtn.prop('disabled', !state.available);
         $exportBtn.attr('aria-disabled', state.available ? 'false' : 'true');
@@ -30,13 +19,19 @@ $(document).ready(function() {
         $exportHint.toggle(!state.available);
     }
 
-    function probeCalendarExport(attempt) {
-        const tries = attempt || 0;
-        const generation = probeGeneration;
+    // Message the active tab directly; only the frame hosting My Class
+    // Schedule list view answers (see calendar_export_page.js). Rejects when
+    // the tab has no content scripts at all — treated as "not on schedule".
+    function activeTabMessage(action) {
+        return browser.tabs.query({ active: true, currentWindow: true }).then(function(tabs) {
+            const tab = tabs && tabs[0];
+            if (!tab || tab.id == null) return undefined;
+            return browser.tabs.sendMessage(tab.id, { action: action });
+        });
+    }
 
+    function probeCalendarExport() {
         readExtensionEnabled().then(function(enabled) {
-            if (generation !== probeGeneration) return;
-
             if (!enabled) {
                 applyCalendarExportPopupState({
                     onSchedule: false,
@@ -44,79 +39,16 @@ $(document).ready(function() {
                 });
                 return;
             }
-
-            browser.tabs.query({ active: true, currentWindow: true }).then(function(tabs) {
-                if (generation !== probeGeneration) return;
-
-                const tab = tabs && tabs[0];
-                if (!tab || tab.id == null) {
-                    applyCalendarExportPopupState({
-                        onSchedule: false,
-                        extensionEnabled: true
-                    });
-                    return;
-                }
-
-                browser.runtime.sendMessage({
-                    action: 'bkuiCalendarExportProbe',
-                    tabId: tab.id
-                }).then(function(response) {
-                    if (generation !== probeGeneration) return;
-
-                    return readExtensionEnabled().then(function(stillEnabled) {
-                        if (generation !== probeGeneration) return;
-
-                        if (!stillEnabled) {
-                            applyCalendarExportPopupState({
-                                onSchedule: false,
-                                extensionEnabled: false
-                            });
-                            return;
-                        }
-
-                        const onSchedule = !!(response && response.onSchedule);
-                        if (!onSchedule && tries < 12) {
-                            // Scan loop / PeopleSoft DOM may need a moment before the port opens.
-                            setTimeout(function() {
-                                if (generation !== probeGeneration) return;
-                                probeCalendarExport(tries + 1);
-                            }, 250);
-                            return;
-                        }
-                        applyCalendarExportPopupState({
-                            onSchedule: onSchedule,
-                            extensionEnabled: true
-                        });
-                    });
-                }).catch(function() {
-                    if (generation !== probeGeneration) return;
-
-                    if (tries < 12) {
-                        setTimeout(function() {
-                            if (generation !== probeGeneration) return;
-                            probeCalendarExport(tries + 1);
-                        }, 250);
-                        return;
-                    }
-                    applyCalendarExportPopupState({
-                        onSchedule: false,
-                        extensionEnabled: true
-                    });
-                });
-            }).catch(function() {
-                if (generation !== probeGeneration) return;
+            return activeTabMessage('bkuiCalendarExportProbe').then(function(response) {
                 applyCalendarExportPopupState({
-                    onSchedule: false,
+                    onSchedule: !!(response && response.onSchedule),
                     extensionEnabled: true
                 });
             });
         }).catch(function() {
-            if (generation !== probeGeneration) return;
             applyCalendarExportPopupState({ onSchedule: false });
         });
     }
-
-    applyCalendarExportPopupState({ onSchedule: false });
 
     $exportBtn.on('click', function() {
         if ($exportBtn.prop('disabled')) return;
@@ -129,40 +61,22 @@ $(document).ready(function() {
                 });
                 return;
             }
-
-            return browser.tabs.query({ active: true, currentWindow: true }).then(function(tabs) {
-                const tab = tabs && tabs[0];
-                if (!tab || tab.id == null) return;
-
-                return browser.runtime.sendMessage({
-                    action: 'bkuiCalendarExportRun',
-                    tabId: tab.id
-                }).then(function(response) {
-                    if (response && response.ok) {
-                        window.close();
-                        return;
-                    }
-                    return readExtensionEnabled().then(function(stillEnabled) {
-                        if (!stillEnabled) {
-                            applyCalendarExportPopupState({
-                                onSchedule: false,
-                                extensionEnabled: false
-                            });
-                            return;
-                        }
-                        if (response && response.onSchedule) {
-                            applyCalendarExportPopupState({
-                                onSchedule: true,
-                                extensionEnabled: true
-                            });
-                            return;
-                        }
-                        probeCalendarExport();
-                    });
-                });
+            return activeTabMessage('bkuiCalendarExportRun').then(function(response) {
+                const result = response && response.ok ? response.result : null;
+                if (!result) {
+                    probeCalendarExport();
+                    return;
+                }
+                // Download from the popup: the schedule frame is a
+                // cross-origin iframe where Chrome blocks downloads without
+                // a user gesture, and the gesture happened here.
+                if (result.exported > 0) {
+                    downloadCalendarIcs(result.ics, calendarExportFilename());
+                }
+                $exportHint.text(formatCalendarExportToast(result)).show();
             });
         }).catch(function() {
-            /* leave popup open if the run failed to reach the page */
+            probeCalendarExport();
         });
     });
 
@@ -176,32 +90,25 @@ $(document).ready(function() {
     // Event listener for when the toggle is clicked
     $toggleSwitch.on('change', function() {
         const isEnabled = $toggleSwitch.is(':checked'); // Check if it's enabled
-        probeGeneration += 1;
 
         // Save the new state to Chrome storage
         browser.storage.sync.set({
             extensionEnabled: isEnabled
         });
 
-        // change text of "#toggleExtensionLabel" to either "Extension enabled" or "Extension disabled"
+        // Change label
         $('#toggleExtensionLabel').text(isEnabled ? "Extension Enabled" : "Extension Disabled");
 
-        // Send message to background script to enable/disable the extension
+        // Send a message to the background script
         browser.runtime.sendMessage({
-            extensionEnabled: isEnabled
+            action: 'toggleExtension',
+            enabled: isEnabled
         }, function(response) {
             console.log("Background script response:", response);
         });
 
-        // Port drops when disabled; re-probe so the Export control matches.
-        if (!isEnabled) {
-            applyCalendarExportPopupState({
-                onSchedule: false,
-                extensionEnabled: false
-            });
-        } else {
-            probeCalendarExport();
-        }
+        // Keep the Export control in sync with the new enabled state.
+        probeCalendarExport();
     });
 
     probeCalendarExport();

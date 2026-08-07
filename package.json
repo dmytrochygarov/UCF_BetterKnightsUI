@@ -7,7 +7,7 @@
     "build": "node build.js",
     "build:chrome": "node build.js chrome",
     "build:safari": "node build.js safari",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test"
   },
   "repository": {
     "type": "git",

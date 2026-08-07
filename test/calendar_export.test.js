@@ -121,6 +121,51 @@ describe("buildCalendarExport", () => {
     assert.notEqual(uids(a.ics)[0], uids(a.ics)[1]);
   });
 
+  it("keeps UIDs stable when a Meeting's times or date range change", () => {
+    // Story #2/17: re-export after TBA times get real values must update
+    // prior events, so time/range changes may not mint a new UID.
+    const before = buildCalendarExport([lectureMeeting()]);
+    const after = buildCalendarExport([
+      lectureMeeting({
+        startTime: "2:00 PM",
+        endTime: "3:15 PM",
+        rangeStart: "2026-01-19",
+        rangeEnd: "2026-05-04",
+      }),
+    ]);
+    assert.deepEqual(uids(after.ics), uids(before.ics));
+  });
+
+  it("disambiguates same-pattern Meetings within one build", () => {
+    // Same class, type, and days at two different times → distinct UIDs,
+    // deterministic across rebuilds.
+    const meetings = [
+      lectureMeeting(),
+      lectureMeeting({ startTime: "5:00 PM", endTime: "6:15 PM" }),
+    ];
+    const a = buildCalendarExport(meetings);
+    const b = buildCalendarExport(meetings);
+    assert.equal(uids(a.ics).length, 2);
+    assert.notEqual(uids(a.ics)[0], uids(a.ics)[1]);
+    assert.deepEqual(uids(a.ics), uids(b.ics));
+  });
+
+  it("includes a VTIMEZONE for the referenced America/New_York TZID", () => {
+    const result = buildCalendarExport([lectureMeeting()]);
+    assert.match(result.ics, /BEGIN:VTIMEZONE\r\nTZID:America\/New_York/);
+    assert.match(result.ics, /TZNAME:EST/);
+    assert.match(result.ics, /TZNAME:EDT/);
+    assert.match(result.ics, /END:VTIMEZONE/);
+  });
+
+  it("stamps events with a current UTC DTSTAMP", () => {
+    const result = buildCalendarExport([lectureMeeting()]);
+    const stamp = field(vevents(result.ics)[0], "DTSTAMP");
+    assert.match(stamp, /^\d{8}T\d{6}Z$/);
+    const year = Number(stamp.slice(0, 4));
+    assert.ok(year >= 2026, "DTSTAMP should be build time, not a fixed epoch");
+  });
+
   it("skips non-Exportable Meetings and counts them without inventing times", () => {
     const result = buildCalendarExport([
       lectureMeeting(),
