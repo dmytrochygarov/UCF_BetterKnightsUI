@@ -40,6 +40,12 @@ async function fetchProfessorRatingsFromBackground(name) {
           return reject(browser.runtime.lastError); // Handle error from the extension system
         }
 
+        // A dropped channel can surface as an undefined response with no
+        // lastError; without this reject the outer await would hang forever.
+        if (!response) {
+          return reject(new Error("no response from background script"));
+        }
+
         if (response.error) {
           reject(response.error);
         } else {
@@ -60,6 +66,12 @@ async function fetchProfessorSigleRatingFromBackground(url) {
       (response) => {
         if (browser.runtime.lastError) {
           return reject(browser.runtime.lastError); // Handle error from the extension system
+        }
+
+        // A dropped channel can surface as an undefined response with no
+        // lastError; without this reject the outer await would hang forever.
+        if (!response) {
+          return reject(new Error("no response from background script"));
         }
 
         if (response.error) {
@@ -127,6 +139,14 @@ async function parseRateMyProfessorData(rawProfessorName, data) {
         .split(" ")[0]
         .trim()
     );
+    // A soft-404 or redesigned profile page parses to NaN; a NaN rating
+    // would render as a "NaN" badge and poison the column's data-order.
+    if (
+      !Number.isFinite(professorData.avgRating) ||
+      !Number.isFinite(professorData.numRatings)
+    ) {
+      return null;
+    }
     return professorData;
   }
   return null;

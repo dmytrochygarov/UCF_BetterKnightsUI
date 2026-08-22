@@ -56,7 +56,7 @@ window.bkuiFormatMode = function (mode) {
 };
 
 window.bkuiFormatDays = function (days) {
-  const names = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+  const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   if (!days) return "";
   const out = [];
   for (let i = 0; i < days.length && i < names.length; i++) {
@@ -192,7 +192,9 @@ window.bkuiGetContainerData = function (container) {
   data = [];
   $(container)
     .find(".betterknightsui-old-container")
-    .find('div[id^="win0divSSR_CLSRSLT_WRK_GROUPBOX3$"]')
+    .find(
+      'div[id^="' + window.getWinDivPrefix() + 'SSR_CLSRSLT_WRK_GROUPBOX3$"]'
+    )
     .each(function () {
       const row_data = window.extractDataFromTableRow(this);
       if (row_data != null) data.push(row_data);
@@ -310,7 +312,9 @@ window.bkuiSetButtonState = function ($btn, state) {
 // Where the course name and the collapse chevron live.
 window.bkuiFindTitleHost = function (container) {
   const $label = $(container)
-    .find('div[id^="win0divSSR_CLSRSLT_WRK_GROUPBOX2GP"]')
+    .find(
+      'div[id^="' + window.getWinDivPrefix() + 'SSR_CLSRSLT_WRK_GROUPBOX2GP"]'
+    )
     .first();
   if ($label.length > 0) {
     const $cell = $label.closest("td");

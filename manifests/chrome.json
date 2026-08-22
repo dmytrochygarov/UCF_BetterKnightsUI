@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "BetterKnightsUI - New Look for myUCF",
-  "version": "1.9",
+  "version": "2.0",
   "description": "Makes myUCF cleaner and easier to navigate for a better course browsing experience!",
   "permissions": ["storage"],
-  "host_permissions": ["*://www.ratemyprofessors.com/"],
+  "host_permissions": ["*://www.ratemyprofessors.com/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": "images/popup_icon.png"
@@ -39,6 +39,7 @@
       "css": ["css/style.css", "css/datatables.min.css"],
       "matches": [
         "https://csprod-ss.net.ucf.edu/*/CSPROD/STUDENT/*",
+        "https://csprod-ss.net.ucf.edu/*/CSPROD*/EMPLOYEE/*",
         "https://my.ucf.edu/psp/IHPROD/EMPLOYEE/CSPROD/*"
       ],
       "match_about_blank": true,

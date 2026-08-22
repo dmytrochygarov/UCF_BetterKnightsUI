@@ -1,26 +1,49 @@
-window.getWindowClassSearchTableContainer = function () {
-  let element1 = $('td.PSGROUPBOXLABEL:contains("class section(s) found")');
-  let element2 = $("#DERIVED_REGFRM1_TITLE1");
+// PeopleSoft prefixes its generated wrapper ids with the frame's window
+// instance: "win0div...", "win4div...". The number matches the frame's
+// <form name="winN"> and depends on how the portal opened the target frame
+// (the pre-2026 portal used win0; the 2026 redesign loads the class search
+// iframe as win4 via /psc/CSPROD_4/EMPLOYEE/SA/...), so it is resolved from
+// the DOM instead of being hardcoded. Returns e.g. "win4div", or null when
+// this frame is not a PeopleSoft content frame. Only a found prefix is
+// cached: the form may not exist yet on the first scan ticks.
+window.getWinDivPrefix = function () {
+  if (window._bkuiWinDivPrefix) return window._bkuiWinDivPrefix;
+  const form = document.querySelector("form[name^='win']");
+  const name = form ? form.getAttribute("name") || "" : "";
+  if (!/^win\d+$/.test(name)) return null;
+  window._bkuiWinDivPrefix = name + "div";
+  return window._bkuiWinDivPrefix;
+};
 
+window.getWindowClassSearchTableContainer = function () {
+  const win = window.getWinDivPrefix();
+  if (win == null) return null;
+  let element1 = $('td.PSGROUPBOXLABEL:contains("class section(s) found")');
+
+  // The pre-2026 page carried a #DERIVED_REGFRM1_TITLE1 that was checked
+  // here as a second fingerprint; the redesigned page dropped it (only
+  // DERIVED_REGFRM1_DESCR1 remains), so the label + container pair is the
+  // whole page fingerprint now.
   let table_container = $(
-    "#win0divDERIVED_CLSRCH_GROUP6 #win0divSSR_CLSRSLT_WRK_GROUPBOX1 #ACE_SSR_CLSRSLT_WRK_GROUPBOX1"
+    "#" +
+      win +
+      "DERIVED_CLSRCH_GROUP6 #" +
+      win +
+      "SSR_CLSRSLT_WRK_GROUPBOX1 #ACE_SSR_CLSRSLT_WRK_GROUPBOX1"
   );
-  if (
-    element1.length == 0 ||
-    element2.length == 0 ||
-    table_container.length == 0
-  )
-    return null;
+  if (element1.length == 0 || table_container.length == 0) return null;
   return table_container;
 };
 
 window.getWindowClassSearchFilterContainer = function () {
+  const win = window.getWinDivPrefix();
+  if (win == null) return null;
   let element1 = $('td.PSGROUPBOXLABEL:contains("Search for Classes")');
-  let element2 = $("#win0divDERIVED_CLSRCH_GROUP2");
 
-  let container = $("#win0divDERIVED_CLSRCH_GROUP2 #ACE_DERIVED_CLSRCH_GROUP2");
-  if (element1.length == 0 || element2.length == 0 || container.length == 0)
-    return null;
+  let container = $(
+    "#" + win + "DERIVED_CLSRCH_GROUP2 #ACE_DERIVED_CLSRCH_GROUP2"
+  );
+  if (element1.length == 0 || container.length == 0) return null;
   return container;
 };
 
@@ -87,6 +110,7 @@ window.prettifyMode = function (mode) {
       VL: 6, // Video Livestream
       V: 7, // Online Video Content
       W: 8, //Web-Based
+      S: 9, // Synchronous Online
     };
 
     let typeId = null;
@@ -132,9 +156,11 @@ window.prettifyDaysAndTimesLine = function (inputString) {
       We: 2,
       Th: 3,
       Fr: 4,
+      Sa: 5,
+      Su: 6,
     };
     const result = {
-      days: [0, 0, 0, 0, 0],
+      days: [0, 0, 0, 0, 0, 0, 0],
       start_time: "",
       end_time: "",
       duration: "",
@@ -305,10 +331,13 @@ window.BKUI_LABELS = {
     6: "Video<br>Livestream",
     7: "Online Video<br>Content",
     8: "Web-Based",
+    9: "Synchronous<br>Online",
   },
 };
 
 window.extractDataFromTableRow = function (container) {
+  const win = window.getWinDivPrefix();
+  if (win == null) return null;
   var tr = $(container).find("[id^='trSSR_CLSRCH_MTG1\\$']");
   if (tr.length === 0) return null;
 
@@ -337,7 +366,9 @@ window.extractDataFromTableRow = function (container) {
   let dates = $(datesElement)?.html() ?? null;
 
   let statusElementImage =
-    $(tr).find("[id^='win0divDERIVED_CLSRCH_SSR_STATUS_LONG'] img")[0] ?? null;
+    $(tr).find(
+      "[id^='" + win + "DERIVED_CLSRCH_SSR_STATUS_LONG'] img"
+    )[0] ?? null;
   let status = "?";
   if (statusElementImage) {
     let statusSrc = $(statusElementImage)?.attr("src");
@@ -347,14 +378,15 @@ window.extractDataFromTableRow = function (container) {
   }
 
   let isZeroCost =
-    $(tr).find("[id^='win0divFX_DERIVED_RO_FX_ZERO_COST_TXTBK']").length > 0;
+    $(tr).find("[id^='" + win + "FX_DERIVED_RO_FX_ZERO_COST_TXTBK']").length >
+    0;
 
   let syllabusElement =
     $(tr).find("[id^='FX_INST_CLS_WRK_HTMLAREA']")[0] ?? null;
   let syllabusHref = $(syllabusElement)?.find("a")?.attr("href") ?? null;
 
   let buttonElement =
-    $(tr).find("[id^='win0divSSR_PB_SELECT'] a input")[0] ?? null;
+    $(tr).find("[id^='" + win + "SSR_PB_SELECT'] a input")[0] ?? null;
   let buttonAction = null;
   if (buttonElement) {
     let buttonId = $(buttonElement).attr("id");
@@ -468,8 +500,12 @@ window.showToastShare = function () {
   });
 };
 
+// storage.sync.get must use the promise form: webextension-polyfill's get
+// takes at most one argument and throws synchronously on the callback form
+// (native Chrome's own `browser` namespace tolerates it, older Chromium
+// running through the polyfill wrapper does not).
 window.handleToastShare = function () {
-  browser.storage.sync.get("extensionShareToastCount", function (data) {
+  browser.storage.sync.get("extensionShareToastCount").then(function (data) {
     let launchCount = data.extensionShareToastCount || 0;
     launchCount++;
     browser.storage.sync.set({
@@ -497,8 +533,12 @@ window.generateTable = function (container, data) {
   $("#ACE_SSR_CLSRSLT_WRK_GROUPBOX1 td").css("height", "fit-content");
 
   if (generateTableInContainerWithData(container, data)) {
-    // create popup
-    setTimeout(window.handleToastShare, 3000);
+    // create popup — once per page load, not once per course group, or a
+    // multi-course result advances the launch counter several times at once
+    if (!window._bkuiToastScheduled) {
+      window._bkuiToastScheduled = true;
+      setTimeout(window.handleToastShare, 3000);
+    }
   }
 };
 
@@ -514,8 +554,8 @@ window.toggleContainers = function (container, isActive) {
 window.replaceBrokenImages = function (containerEl) {
   // keyed by "from" URL
   const replacements = {
-    "https://my.ucf.edu/cs/CSPROD/cache2/PS_CS_STATUS_WAITLIST_ICN_3.JPG": {
-      to: "https://csprod-ss.net.ucf.edu/cs/CSPROD/cache2/PS_CS_STATUS_WAITLIST_ICN_3.JPG",
+    "https://my.ucf.edu/cs/CSPROD/cache2/PS_CS_STATUS_WAITLIST_ICN_1.JPG": {
+      to: "https://csprod-ss.net.ucf.edu/cs/CSPROD/cache2/PS_CS_STATUS_WAITLIST_ICN_1.JPG",
       label: "Wait List",
     },
     "https://my.ucf.edu/cs/CSPROD/cache2/PS_CS_STATUS_CLOSED_ICN_1.gif": {
@@ -560,6 +600,8 @@ window.replaceBrokenImages = function (containerEl) {
 
 var clicked = false;
 window.handleTable = function (idx, container, isActive) {
+  const win = window.getWinDivPrefix();
+  if (win == null) return;
   let new_container = $(container).find(".betterknightsui-new-container");
   let old_container = $(container).find(".betterknightsui-old-container");
   window.replaceBrokenImages(old_container);
@@ -569,7 +611,7 @@ window.handleTable = function (idx, container, isActive) {
   } else if (isActive) {
     if (idx > 0) $(container).css("margin-top", "20px");
     $(container).children("table:first").css("width", "100%");
-    $('div[id^="win0divSSR_CLSRSLT_WRK_GROUPBOX2GP"]').css({
+    $('div[id^="' + win + 'SSR_CLSRSLT_WRK_GROUPBOX2GP"]').css({
       color: "#ab5b1a",
       "font-family": "Arimo",
       "font-size": "14px",
@@ -609,7 +651,7 @@ window.handleTable = function (idx, container, isActive) {
     });
     //Create new
     let rows = $(container).find(
-      'div[id^="win0divSSR_CLSRSLT_WRK_GROUPBOX3$"]'
+      'div[id^="' + win + 'SSR_CLSRSLT_WRK_GROUPBOX3$"]'
     );
     if (rows.length == 0) return;
 
@@ -659,8 +701,10 @@ window.handleTable = function (idx, container, isActive) {
 
 window.renameAndReorderCourseNumberOptions = function (
   courseNumberDropdown,
-  course_number
+  course_number,
+  resetSelection
 ) {
+  const previousValue = courseNumberDropdown.val();
   const course_number_text =
     '"' + (!course_number ? "[Course Number]" : course_number) + '"';
 
@@ -727,8 +771,14 @@ window.renameAndReorderCourseNumberOptions = function (
     courseNumberDropdown.append(option);
   });
 
-  // Set the first option (empty) as selected
-  courseNumberDropdown.find("option:first").prop("selected", true);
+  // Only the initial card build resets to the blank placeholder. This
+  // function also runs on every keystroke in the Course Number and Subject
+  // fields, and those calls must not clobber the condition the user chose.
+  if (resetSelection) {
+    courseNumberDropdown.find("option:first").prop("selected", true);
+  } else {
+    courseNumberDropdown.val(previousValue);
+  }
 };
 
 window.prettifyElementsInsideSearchClassFilterMainContainer = function (
@@ -828,7 +878,8 @@ window.prettifyElementsInsideSearchClassFilterMainContainer = function (
 
   window.renameAndReorderCourseNumberOptions(
     courseNumberDropdown,
-    courseNumberInput.val()
+    courseNumberInput.val(),
+    true
   );
 
   // Text input: "Course Keyword"
@@ -895,7 +946,7 @@ window.prettifyElementsInsideSearchClassFilterMainContainer = function (
   // Button "Search"
   let searchButton = $(container)
     .closest("#ACE_DERIVED_CLSRCH_GROUP2")
-    .find("#win0divCLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH");
+    .find("#" + window.getWinDivPrefix() + "CLASS_SRCH_WRK2_SSR_PB_CLASS_SRCH");
   let searchButtonClone = searchButton.clone();
   let searchButtonInput = $(searchButtonClone).find("input");
   searchButtonInput
@@ -982,7 +1033,9 @@ window.prettifyElementsInsideSearchClassFilterMainContainer = function (
 };
 
 window.prettifyClassSearchFilterContainer = function (isActive) {
-  let main_container = $("#win0divDERIVED_CLSRCH_SSR_GROUP_BOX_1\\$0");
+  let main_container = $(
+    "#" + window.getWinDivPrefix() + "DERIVED_CLSRCH_SSR_GROUP_BOX_1\\$0"
+  );
 
   //warp original content inside the toggle container
 
@@ -1028,14 +1081,15 @@ window.myscan = function () {
   window.checkExtensionState();
 
   if (window.getWindowClassSearchTableContainer() != null) {
-    let tables = $('div[id^="win0divSSR_CLSRSLT_WRK_GROUPBOX2$"]');
+    const win = window.getWinDivPrefix();
+    let tables = $('div[id^="' + win + 'SSR_CLSRSLT_WRK_GROUPBOX2$"]');
     if (tables.length == 0) return;
     tables.each(function (i) {
       window.handleTable(i, this, extensionEnabled);
     });
 
     if (extensionEnabled) {
-      $("#win0divDERIVED_REGFRM1_DESCR1").each(function () {
+      $("#" + win + "DERIVED_REGFRM1_DESCR1").each(function () {
         // Remove the closest parent <tr> element
         $(this).closest("tr").remove();
       });
@@ -1052,7 +1106,8 @@ window.myscan = function () {
 window.checkExtensionState = function () {
   try {
     if (typeof browser !== "undefined" && browser.storage && browser.storage.sync) {
-      browser.storage.sync.get("extensionEnabled", function (data) {
+      // Promise form on purpose — see the note above handleToastShare.
+      browser.storage.sync.get("extensionEnabled").then(function (data) {
         let _extensionEnabled =
           data.extensionEnabled !== undefined ? data.extensionEnabled : true;
         if (_extensionEnabled !== window.extensionEnabled) {

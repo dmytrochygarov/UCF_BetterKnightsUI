@@ -113,20 +113,47 @@ function surnameCandidates(tokens) {
   return out;
 }
 
-function bestGivenSim(targetFirst, tokens, usedRange) {
+// expectedIdx is the conventional given-name position for the chosen surname
+// range: token 0 when the surname is a suffix ("First Last"), the token right
+// after the surname when it is a prefix ("Last First"). A token anywhere else
+// (a middle name, say) is capped below 1.0 so "David Alan Cohen" cannot be a
+// perfect match for an RMP "Alan Cohen" — only the conventional position may
+// produce the perfect score the >= 1 threshold demands.
+function bestGivenSim(targetFirst, tokens, usedRange, expectedIdx) {
   if (!targetFirst) return { score: 0, token: null, reason: null };
   const { start, end } = usedRange;
   let best = { score: 0, token: null, reason: null };
+
+  // Compare the whole non-surname remainder first, so multi-token first
+  // names ("jean luc", "anna maria") can reach an exact 1.0 — individual
+  // tokens alone never can. Non-equal remainders stay below 1 by JW's
+  // definition, so this cannot loosen the threshold.
+  const outside = tokens.filter((t, i) => i < start || i > end);
+  const remainder = outside.join(" ");
+  if (remainder && outside.length > 1) {
+    const s =
+      remainder === targetFirst ? 1 : jaroWinkler(targetFirst, remainder);
+    if (s > best.score) best = { score: s, token: remainder, reason: "remainder" };
+  }
+
   for (let i = 0; i < tokens.length; i++) {
     if (i >= start && i <= end) continue; // skip chosen surname tokens
     const t = tokens[i];
-    if (t.length === 1 && t[0] === targetFirst[0]) {
-      if (0.95 > best.score)
-        best = { score: 0.95, token: t, reason: "initial" };
+    let s, reason;
+    if (t === targetFirst) {
+      // exact equality must win even for single-letter first names, which
+      // the "initial" branch below would otherwise cap at 0.95
+      s = 1;
+      reason = "exact";
+    } else if (t.length === 1 && t[0] === targetFirst[0]) {
+      s = 0.95;
+      reason = "initial";
     } else {
-      const s = jaroWinkler(targetFirst, t);
-      if (s > best.score) best = { score: s, token: t, reason: "jw" };
+      s = jaroWinkler(targetFirst, t);
+      reason = "jw";
     }
+    if (i !== expectedIdx) s = Math.min(s, 0.98);
+    if (s > best.score) best = { score: s, token: t, reason };
   }
   return best;
 }
@@ -165,26 +192,39 @@ function getMatchingProfessorId(rawName, professors) {
       .sort((a, b) => b.sim - a.sim);
 
     const picked = surnameScores[0];
-    const given = bestGivenSim(first, inputTokens, {
-      start: candRanges[picked.idx].start,
-      end: candRanges[picked.idx].end,
-    });
+    const pickedRange = candRanges[picked.idx];
+    const given = bestGivenSim(
+      first,
+      inputTokens,
+      { start: pickedRange.start, end: pickedRange.end },
+      pickedRange.where === "suffix" ? 0 : pickedRange.end + 1
+    );
 
     const surnameSim = picked.sim;
     const givenSim = given.score;
     let score = SURNAME_W * surnameSim + GIVEN_W * givenSim;
 
     p.score = score;
+    p.matchWhere = picked.where;
   }
 
   // LOGIC EXPLANATION
   // - only take seriously perfect scores (1.00)
-  // - return based on whoever has more ratings
+  // - prefer the conventional "First Last" orientation over a reversed
+  //   ("Last First") one: for input "Ali Hassan", both RMP "Ali Hassan"
+  //   (suffix surname) and RMP "Hassan Ali" (prefix surname) score 1.0,
+  //   and only orientation tells the two humans apart
+  // - then return based on whoever has more ratings
   // - if zero ratings, ignore also
 
   const sortedProfessors = professors
     .filter((p) => p.score >= 1)
-    .sort((a, b) => b.numRatings - a.numRatings);
+    .sort(
+      (a, b) =>
+        (a.matchWhere === "suffix" ? 0 : 1) -
+          (b.matchWhere === "suffix" ? 0 : 1) ||
+        b.numRatings - a.numRatings
+    );
 
   if (!sortedProfessors || sortedProfessors.length === 0) return null;
   return sortedProfessors[0].id;

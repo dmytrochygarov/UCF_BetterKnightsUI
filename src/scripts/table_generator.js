@@ -72,7 +72,7 @@ function getTimeSortingValue(timeString) {
 
 function generateTableInContainerWithData(container, data) {
   //Check if already added
-  if (container.find("betterknightsui-table").length > 0) return false;
+  if (container.find(".betterknightsui-table").length > 0) return false;
 
   // Create the table structure with jQuery
   const $table = $(
@@ -280,6 +280,11 @@ function generateTableInContainerWithData(container, data) {
         icon: "fa-laptop",
         badge_style: null,
       },
+      9: {
+        text: window.BKUI_LABELS.mode[9],
+        icon: "fa-video",
+        badge_style: null,
+      },
     };
 
     // Convert mode or leave blank if null
@@ -338,7 +343,7 @@ function generateTableInContainerWithData(container, data) {
 
     // Handle days array and build day boxes
     if (item.daysAndTimes && item.daysAndTimes.length > 0) {
-      const days = ["M", "Tu", "W", "Th", "F"];
+      const days = ["M", "Tu", "W", "Th", "F", "Sa", "Su"];
 
       for (let i = 0; i < item.daysAndTimes.length; i++) {
         const data = item.daysAndTimes[i];
@@ -353,6 +358,9 @@ function generateTableInContainerWithData(container, data) {
 
         if (data.days) {
           $.each(data.days, function (i, day) {
+            // Weekend boxes appear only when the section actually meets
+            // then, so ordinary Mo-Fr rows keep their five-box layout.
+            if (i >= 5 && day !== 1) return;
             const $dayBox = $('<div class="day-box"></div>').text(days[i]);
 
             if (day === 1) {
@@ -661,7 +669,12 @@ async function processProfessorName(name) {
 function updateAllElementsWithProfName(professorName, data) {
   if (data == null) return;
   // Find all elements with "data-rmp-prof-name" equal to profName
-  let elements = $(`[data-rmp-prof-name='${professorName}']`);
+  // Match by attribute value instead of an interpolated selector: a name
+  // with an apostrophe ("Daniel O'Brien") would otherwise produce an
+  // invalid selector, throw, and silently discard the fetched rating.
+  let elements = $("[data-rmp-prof-name]").filter(function () {
+    return $(this).attr("data-rmp-prof-name") === professorName;
+  });
 
   // Create arrays to store elements with specific attributes
   let elementsWithRatingAmount = [];

@@ -25,6 +25,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
           error: error.message,
         })
       );
+  } else {
+    // Unknown message: returning true here would hold the channel open for
+    // a response that never comes (and keep the MV3 worker awake).
+    return false;
   }
 
   // Indicate that the listener will respond asynchronously

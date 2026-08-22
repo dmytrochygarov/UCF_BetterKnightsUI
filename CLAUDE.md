@@ -46,7 +46,7 @@ Target page for all manual testing: myUCF → Student Self Service → Student R
 
 ### Verifying without a UCF login
 
-There is no test suite, and the real page is behind a UCF NID. The content scripts do load into jsdom, though — they are plain globals with no ES modules, and outside `browser.storage`/`browser.runtime` they touch no extension API. A throwaway harness can `eval` the manifest's `js` list in order against a hand-built PeopleSoft-shaped DOM (a `win0divSSR_CLSRSLT_WRK_GROUPBOX2$N` box wrapping an `ACE_SSR_CLSRSLT_WRK_GROUPBOX2$N` table of `win0divSSR_CLSRSLT_WRK_GROUPBOX3$N` rows), stub `window.browser.storage.sync.get` to yield `{extensionEnabled: true}`, and call `window.myscan()` directly. Calling it repeatedly is also the cheapest proof that a new DOM mutation is idempotent.
+There is no test suite, and the real page is behind a UCF NID. The content scripts do load into jsdom, though — they are plain globals with no ES modules, and outside `browser.storage`/`browser.runtime` they touch no extension API. A throwaway harness can `eval` the manifest's `js` list in order against a hand-built PeopleSoft-shaped DOM (a `winNdivSSR_CLSRSLT_WRK_GROUPBOX2$N` box wrapping an `ACE_SSR_CLSRSLT_WRK_GROUPBOX2$N` table of `winNdivSSR_CLSRSLT_WRK_GROUPBOX3$N` rows, plus a `<form name="winN">` so `getWinDivPrefix` resolves), stub `window.browser.storage.sync.get` to yield `{extensionEnabled: true}`, and call `window.myscan()` directly. Even better than a hand-built DOM: a page saved from the browser via "save as HTML" flattens the target iframe's document as literal text between `<iframe …>` and `</iframe>` — slice that inner document out and feed it to jsdom whole. Calling it repeatedly is also the cheapest proof that a new DOM mutation is idempotent.
 
 jsdom is deliberately not a dependency here — install it outside the tree. Two traps: `navigator.clipboard` and `document.execCommand` both need stubbing, and one unhandled rejection (loading `table_generator.js` without `rateMyProfessorAPI.js`, say) kills the Node process outright, so always load the full script list.
 
@@ -81,7 +81,9 @@ The original PeopleSoft table is never destroyed. [`handleTable`](src/scripts/ma
 
 ### PeopleSoft selectors
 
-Everything hangs off generated PeopleSoft ids, matched by prefix (`[id^='MTG_CLASS_NBR']`, `div[id^="win0divSSR_CLSRSLT_WRK_GROUPBOX3$"]`, …). These are brittle by nature — when myUCF changes, this is what breaks. Note that `$` is a literal character in those ids and must be escaped in direct selectors (`#win0divDERIVED_CLSRCH_SSR_GROUP_BOX_1\\$0`) but not inside `[id^=...]` strings.
+Everything hangs off generated PeopleSoft ids, matched by prefix (`[id^='MTG_CLASS_NBR']`, `div[id^="win4divSSR_CLSRSLT_WRK_GROUPBOX3$"]`, …). These are brittle by nature — when myUCF changes, this is what breaks. Note that `$` is a literal character in those ids and must be escaped in direct selectors (`#win4divDERIVED_CLSRCH_SSR_GROUP_BOX_1\\$0`) but not inside `[id^=...]` strings.
+
+PeopleSoft's wrapper-div ids are prefixed with the frame's window instance (`win0div…`, `win4div…`), which matches the frame's `<form name="winN">` and depends on how the portal opened the frame — the pre-2026 portal used `win0`; the 2026 redesign serves the same DOM from `/psc/CSPROD_4/EMPLOYEE/SA/…` as `win4`. Never hardcode it: [`getWinDivPrefix`](src/scripts/main_script.js#L1) resolves it from the DOM at runtime, and every `winNdiv` selector is built from it.
 
 Two host patterns are matched (`csprod-ss.net.ucf.edu` and `my.ucf.edu`), with `all_frames: true` because the search UI lives in an iframe — the content scripts run in several frames at once, and the container-detection helpers (`getWindowClassSearchTableContainer`, `getWindowClassSearchFilterContainer`) returning `null` is the normal case in most of them.
 
